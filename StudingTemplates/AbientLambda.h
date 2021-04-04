@@ -31,3 +31,58 @@ namespace ambient {
     }
 
 }
+
+
+/*
+template<typename ... Args> struct FunctorImpl;
+
+template<typename R, typename ... Args>
+struct FunctorImpl<R(Args ...)> {
+	typedef R(*FT)(Args ...);
+	FunctorImpl(FT fn) : m_fn(fn) { ; }
+	R operator () (Args ... args) {
+		return m_fn(args ...);
+	}
+	FT m_fn;
+};
+template<typename FT>
+struct Functor : public FunctorImpl<FT>
+{
+	Functor() : FunctorImpl<FT>(NULL) { ; }
+	Functor(FT fn) : FunctorImpl<FT>(fn) { ; }
+};
+
+
+template<typename T>
+T sm(T only) {
+	return only;
+};
+template<typename T, typename ...Targs>
+T sm (const T& First, const Targs&... rest) {
+	T value = First;
+	value += sm(rest...);
+	//std::cout << "I call you bitch" << std::endl;
+	std::cout <<"result: " << value << std::endl;
+	return value;
+};
+
+
+
+
+template<typename T>
+struct memfun_type {
+	using type = T;
+};
+
+template<typename Ret, typename Class, typename... Args>
+struct memfun_type<Ret(Class::*)(Args...) const> {
+	using type = std::function<Ret(Args...)>;
+};
+
+template<typename F>
+typename memfun_type<decltype(&F::operator())>::type
+	FFL(F const& func)
+{ // Function from lambda !
+	return func;
+}
+*/

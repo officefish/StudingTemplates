@@ -7,51 +7,28 @@
 
 #include "list/singly/hasky.h"
 
-template<typename T>
-std::function<std::any(std::any)> mul () {
-	std::function<std::any(std::any)> f = [](std::any input) {
-		std::type_index index = std::type_index(input.type());
-		if (index == std::type_index(typeid(T))) {
-			T value = std::any_cast<T>(input);
-			value *= value;
-			return value;
-		}
-		else if (index == std::type_index(typeid(std::initializer_list<std::any>))) {
-			auto list = std::any_cast<std::initializer_list<std::any>>(input);
-			T value = std::any_cast<T>(*list.begin());
-			for (auto it = std::next(list.begin()); it != list.end(); ++it) {
-				value *= std::any_cast<T>(*it);
-			}
-			return value;
-		}
-		return 0;
-	};
-	return f;
-}
-
-
-
-
-
-
 int main() {
 
-	auto sm = hasky::sum<int>();
-	auto ml = hasky::mul<int>();
+	auto sm = term::legion::sum<int>();
+	auto ml = term::legion::mul<int>();
 
-	Hasky list{ ml, ml, sm, sm, sm };
-	std::any value = list.reduce(1);
+	//Hasky list{ ml, ml, sm, sm, sm };
+	//std::any value = list.reduce(1);
 
 	Hasky list2{ ml };
 	std::any value2 = list2.reduce({ 2, 2 });
 
-	Hasky list3{ sm };
-	std::any value3 = list3.reduce({ 3, 3, 4 });
+	//Hasky list3{ sm };
+	//std::any value3 = list3.reduce({ 3, 3, 4 });
 
-	std::cout << std::any_cast<int>(value) << std::endl; // output: 4096
-	std::cout << std::any_cast<int>(value2) << std::endl; // output: 4
-	std::cout << std::any_cast<int>(value3) << std::endl; // output: 10
+	//Hasky list4{ sm };
+	//std::vector<std::any> constants{ 1, 2, 3, 4, 5 };
+	//std::any value4 = list4.reduce(constants);
 
+	//std::cout << std::any_cast<int>(value) << std::endl; // output: 4096 // (64*(8*(4+(2+(1+1)))))
+	std::cout << std::any_cast<int>(value2) << std::endl; // output: 4 (2+2)
+	//std::cout << std::any_cast<int>(value3) << std::endl; // output: 10 (3+3+4)
+	//std::cout << std::any_cast<int>(value4) << std::endl; // output: 10 (1+2+3+4+5)
 
 	//for (auto&& v : list3) {
 		//std::cout << v << " ";

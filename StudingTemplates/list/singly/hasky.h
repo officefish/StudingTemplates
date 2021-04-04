@@ -2,65 +2,60 @@
 #include <functional>
 #include <any>
 #include<typeindex>
-#include"../.././AbientLambda.h"
+#include<type_traits>
+#include<variant>
+#include <optional>
 
-namespace hsk {
+#include<vector>
+#include<list>
+#include<forward_list>
+#include<deque>
+#include<queue>
+#include<stack>
 
-	/*
-	template<typename ... Args> struct FunctorImpl;
+namespace sigma {
 
-	template<typename R, typename ... Args>
-	struct FunctorImpl<R(Args ...)> {
-		typedef R(*FT)(Args ...);
-		FunctorImpl(FT fn) : m_fn(fn) { ; }
-		R operator () (Args ... args) {
-			return m_fn(args ...);
-		}
-		FT m_fn;
-	};
-	template<typename FT>
-	struct Functor : public FunctorImpl<FT>
-	{
-		Functor() : FunctorImpl<FT>(NULL) { ; }
-		Functor(FT fn) : FunctorImpl<FT>(fn) { ; }
-	};
-
-
-	template<typename T>
-	T sm(T only) {
-		return only;
-	};
-	template<typename T, typename ...Targs>
-	T sm (const T& First, const Targs&... rest) {
-		T value = First;
-		value += sm(rest...);
-		//std::cout << "I call you bitch" << std::endl;
-		std::cout <<"result: " << value << std::endl;
-		return value;
-	};
-
-
-
-
-	template<typename T>
-	struct memfun_type {
-		using type = T;
-	};
-
-	template<typename Ret, typename Class, typename... Args>
-	struct memfun_type<Ret(Class::*)(Args...) const> {
-		using type = std::function<Ret(Args...)>;
-	};
-
-	template<typename F>
-	typename memfun_type<decltype(&F::operator())>::type
-		FFL(F const& func)
-	{ // Function from lambda !
-		return func;
+	template <class... Args>
+	auto any_to_variant_cast(std::any a)  -> std::variant<Args...> {
+		if (!a.has_value())
+			throw std::bad_any_cast();
+		std::optional<std::variant<Args...>> v = std::nullopt;
+		bool found = ((a.type() == typeid(Args) && (v = std::any_cast<Args>(std::move(a)), true)) || ...);
+		if (!found)
+			throw std::bad_any_cast{};
+		return std::move(*v);
 	}
-	*/
 
+	template <class T>
+	class variadic_container {
+#define ANY_VARIANTS std::initializer_list<std::any>, std::vector<std::any>
+#define VARIANTS std::initializer_list<T>, std::vector<T>
+		using container_variant = std::variant<VARIANTS>;
 
+	private:
+		std::any _container;
+
+	public:
+		template<class C> variadic_container(const C& c) : _container(c) {}
+		template<class C> variadic_container(C&& c) : _container(c) {}
+
+		template<class C>
+		variadic_container& operator=(const C& c) { _container = c; return *this; }
+		template<class C>
+		variadic_container& operator=(C&& c) { _container = std::move(c); return *this; }
+
+		template <class T>
+		T everyValue(std::function<T(T, T)> algebra) {
+			auto variant = any_to_variant_cast<ANY_VARIANTS>(_container);
+			return std::visit([this, algebra](auto& variant) {
+				T value = std::any_cast<T>(*variant.begin());
+				for (auto it = std::next(variant.begin()); it != variant.end(); ++it)
+					value = algebra(value, std::any_cast<T>(*it));
+				return value;
+			}, variant);
+
+		}
+	};
 }
 
 class Node {
@@ -141,7 +136,6 @@ public:
 		}
 		std::function<std::any(std::any)> func = current->data;
 		std::any result = Terminate(current->next);
-		//std::cout << result << "\n";
 		return func(result);
 	}
 
@@ -167,45 +161,39 @@ public:
 		head = BackInsert(head, cnst);
 		return Terminate(head);
 	}
-
-	template<typename T>
-	static constexpr auto sum = [&](T a, T b) {return a + b; };
-
-	template<typename T>
-	static constexpr auto mul = [&](T a, T b) {return a * b; };
 };
 
-namespace hasky {
+template<typename T>
+class Calculator {
+public:
+
+	static constexpr auto sum = [&](T a, T b) { return a + b; };
+	static constexpr auto mul = [&](T a, T b) { return a * b; };
+};
+
+namespace term::legion {
+
+	using std::function, std::any, std::any_cast, std::type_index;
+	using variadic = sigma::variadic_container<any>;
 
 	template<typename T>
-	std::function<std::any(std::any)> producer(const std::function<T(T, T)>& algebra) { // std::function<T(T,T...)
-
-		std::function<std::any(std::any)> f = [algebra](std::any input) {
-			std::type_index index = std::type_index(input.type());
-			if (index == std::type_index(typeid(T))) {
-				T value = std::any_cast<T>(input);
-				value = algebra(value, value);
-				return value;
-			}
-			else if (index == std::type_index(typeid(std::initializer_list<std::any>))) {
-				auto list = std::any_cast<std::initializer_list<std::any>>(input);
-				T value = std::any_cast<T>(*list.begin());
-				for (auto it = std::next(list.begin()); it != list.end(); ++it) {
-					value = algebra(value, std::any_cast<T>(*it));
-				}
-				return value;
-			}
-			return 0;
+	function<any(any)> legion(const function<T(T, T)>& algebra) { // std::function<T(T,T...)
+		function<any(any)> redex = [algebra](any input) {
+			type_index index = type_index(input.type());
+			if (index == type_index(typeid(T)))
+				return algebra(any_cast<T>(input), any_cast<T>(input));
+			variadic variadic_container(input);
+			return variadic_container.everyValue<T>(algebra);
 		};
-		return f;
+		return redex;
 	}
 
 	template<typename T>
 	std::function<std::any(std::any)> sum() {
-		return producer<T>(Hasky::sum<T>);
+		return legion<T>(Calculator<T>::sum);
 	};
 	template<typename T>
 	std::function<std::any(std::any)> mul() {
-		return producer<T>(Hasky::mul<T>);
+		return legion<T>(Calculator<T>::mul);
 	};
 }
