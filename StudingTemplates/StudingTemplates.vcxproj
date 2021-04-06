@@ -149,7 +149,7 @@
     <ClCompile Include="StudingTemplates.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AbientLambda.h" />
+    <ClInclude Include="AmbientLambda.h" />
     <ClInclude Include="list\singly\forward_list_wrapper.h" />
     <ClInclude Include="Subjects.h" />
     <ClInclude Include="TwoPhaseLookup.h" />

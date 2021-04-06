@@ -38,7 +38,7 @@
     <ClInclude Include="list\singly\forward_list_wrapper.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="AbientLambda.h">
+    <ClInclude Include="AmbientLambda.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
