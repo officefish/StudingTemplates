@@ -353,14 +353,11 @@ namespace calculator {
 	template<typename T>
 	struct Calculator {
 
-		template <typename T, typename U, typename R = std::common_type<T, U>::type>
-		static constexpr R _sum(T a, U b) { return a + b; };
-
 		static constexpr auto sum = [](T a, T b) {
 			if constexpr (is_variant_v<T>) {
 				auto a_value	=	current_to_common_v(a);
 				auto b_value	=	current_to_common_v(b);
-				T result		=	_sum(a_value, b_value);
+				T result		=	(a_value + b_value);
 				return result;
 			}
 			else return a + b;
@@ -368,7 +365,10 @@ namespace calculator {
 
 		static constexpr auto mul = [](T a, T b) {
 			if constexpr (is_variant_v<T>) {
-				return a;
+				auto a_value	=	current_to_common_v(a);
+				auto b_value	=	current_to_common_v(b);
+				T result		=	(a_value * b_value);
+				return result;
 			}
 			else { return a * b; }
 		};
