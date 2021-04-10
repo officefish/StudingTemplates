@@ -41,6 +41,9 @@
     <ClInclude Include="AmbientLambda.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="AnyVisitor.hpp">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="list\singly\hasky.h" />

@@ -150,6 +150,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AmbientLambda.h" />
+    <ClInclude Include="AnyVisitor.hpp" />
     <ClInclude Include="list\singly\forward_list_wrapper.h" />
     <ClInclude Include="Subjects.h" />
     <ClInclude Include="TwoPhaseLookup.h" />
