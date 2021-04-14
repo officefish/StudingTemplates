@@ -151,12 +151,11 @@
   <ItemGroup>
     <ClInclude Include="AmbientLambda.h" />
     <ClInclude Include="AnyVisitor.hpp" />
+    <ClInclude Include="any_proccessor\any_proccessor.h" />
     <ClInclude Include="list\singly\forward_list_wrapper.h" />
     <ClInclude Include="Subjects.h" />
     <ClInclude Include="TwoPhaseLookup.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="list\singly\hasky.h" />
+    <ClInclude Include="type_container\type_pack.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

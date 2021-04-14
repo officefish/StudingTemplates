@@ -1,3 +1,4 @@
+#pragma once
 
 #include <iostream>
 #include <functional>
@@ -11,9 +12,11 @@
 #include<list>
 #include<forward_list>
 #include<deque>
+#include<limits>
+
+#include "./../type_container/type_pack.h"
 
 namespace utilities {
-
 
 	template<typename T>
 	struct is_variant : std::false_type {};
@@ -23,23 +26,6 @@ namespace utilities {
 
 	template<typename T>
 	inline constexpr bool is_variant_v = is_variant<T>::value;
-
-
-	//template<typename T>
-	//struct is_variadic : std::false_type {};
-
-	//template<typename ...Ts, typename = std::enable_if_t<(sizeof...(Ts) > 0)>>
-	//struct is_variadic<Ts...> : std::true_type {};
-
-	//template<typename T>
-	//inline constexpr bool is_variadic_v = is_variadic<T>::value;
-
-	//template<typename T> constexpr unsigned argc_v;
-	//template<typename... T> constexpr unsigned argc_v<T...> = sizeof...(T);
-
-	//template<template T> constexpr bool is_variadic_v = false;
-	//template<template... T> bool is_variadic_v<T...> = argc_v<T...> == 0;
-
 
 	template <typename T, typename = std::enable_if_t<!is_variant_v<T>>>
 	T current_to_common_v(T value) {
@@ -61,7 +47,7 @@ namespace utilities {
 				return static_cast<std::common_type_t<Args...>>(value);
 			}
 
-		}, variant);
+			}, variant);
 	}
 
 	template <typename T>
@@ -84,7 +70,6 @@ namespace utilities {
 			return value;
 		}
 		else if constexpr (is_variant_v<T>) {
-
 			return std::visit([](const auto& elem) {
 				return has_value(elem);
 				}, value);
@@ -106,38 +91,80 @@ namespace utilities {
 	}
 
 	template <typename ... Ts>
-	auto initialize_variant(std::any header, std::variant<Ts...> const &) {
+	auto initialize_variant(std::any header, std::variant<Ts...> const&) {
+
 		std::optional<std::variant<Ts...>> variantOpt = std::nullopt;
-		variantOpt = any_to_variant_cast<Ts...>(header);
-		if (not variantOpt) {
-			using CommonType = typename std::common_type_t<Ts...>;
-			auto valueOpt = get_optional_value<CommonType>(header);
-			if (valueOpt)
-				variantOpt = *valueOpt;
-		}
+		using CommonType = typename std::common_type_t<Ts...>;
+		auto valueOpt = get_optional_value<CommonType>(header);
+		if (valueOpt) variantOpt = *valueOpt;
 		return variantOpt;
 	}
 
-	/*
+	using proccessor::utilities::constexpr_for;
+
 	template <typename ... Ts>
-	auto initialize_variant(std::any header, std::variant<Ts...> const& prototype) {
-		std::optional<std::variant<Ts...>> variantOpt = std::nullopt;
-		variantOpt = get_optional_value<std::variant<Ts...>>(header);
-		return variantOpt;
-	}
-	*/
-	template <class T, class... Ts>
-	T unpack(std::any any) {
-		std::cout << any.has_value() << std::endl;
-		std::optional<std::variant<T, Ts...>> variantOpt = get_optional_value<std::variant<T, Ts...>>(any);
-		if (variantOpt) {
-			return  std::visit([](const auto& elem) {
-				return static_cast<T>(elem);
-				}, *variantOpt);
-		}
-		return 0;
+	auto any_to_common_cast(std::any any) -> std::common_type_t<Ts...> {
+
+		using tuple_t = std::tuple<Ts...>;
+		using common_t = std::common_type_t<Ts...>;
+		common_t value = 0;
+
+		constexpr_for<std::tuple_size_v<tuple_t>>([&](auto index) {
+			constexpr auto i = index.value;
+			using optional_t = std::tuple_element_t<i, tuple_t>;
+			std::optional<optional_t> optValue = get_optional_value<optional_t>(any);
+			if (optValue) {	value = *optValue; };
+		});
+
+		return value;
 	}
 
+	template <typename ... Ts>
+	auto contineous_cast(auto value) {
+
+		using tuple_t = std::tuple<Ts...>;
+
+		using type_pack = tp::type_pack<>;
+		//type_pack pack;
+
+		constexpr_for<std::tuple_size_v<tuple_t>>([&](auto index) {
+			constexpr auto i = index.value;
+			using optional_t = std::tuple_element_t<i, tuple_t>;
+			if (//proccessor::utilities::is_save_cast<decltype(value), optional_t>(value)
+				 value < std::numeric_limits<optional_t>::max()
+				) {
+				//type = proccessor::utilities::just_type<optional_t>{};
+				//return;
+				std::cout << "save" << std::endl;
+				//using type_pack_2 = tp::push_front<optional_t>(type_pack);
+				//type_pack pack;
+				//std::cout << tp::size(pack) << std::endl;
+			}
+			else {
+				std::cout << "unsave" << std::endl;
+			}
+		});
+		//using type_t = typename decltype(type)::type;
+		//static_cast<type_t>(value);
+		//std::cout << tp::size(pack) << std::endl;
+		return value;
+	}
+
+	template <class T, class... Ts>
+	auto unpack_variant(std::any any) {
+		std::optional<std::variant<T, Ts...>> variantOpt = std::nullopt;
+		if (!any.has_value()) return variantOpt;
+		variantOpt = get_optional_value<std::variant<T, Ts...>>(any);
+		return variantOpt;
+	}
+
+
+
+	template<typename, typename = void>
+	constexpr bool is_type_complete_v = false;
+
+	template<typename T>
+	constexpr bool is_type_complete_v<T, std::void_t<decltype(sizeof(T))>> = true;
 
 }
 
@@ -167,67 +194,111 @@ namespace sigma {
 		variadic_container& operator=(C&& c) noexcept { _container = std::move(c); return *this; }
 
 		template<typename T>
-		T constexpr everyValue(const std::function<T(T, T)>& algebra) noexcept {
+		T constexpr reduceValue(const std::function<T(T, T)>& algebra) noexcept {
 
-			T value = 0;
 			std::optional<container_variant> containerOpt = any_to_variant_cast<ANY_VARIANTS>(_container);
-			return ( containerOpt )
-				? __everyContainer<T>(*containerOpt, value, algebra)
-				: __everyValue<T>(_container, value, algebra);
+			T value = (not containerOpt)
+				? __reduceValue<T>(_container, 0, algebra)
+				: 0;
+			return (containerOpt)
+				? __reduceContainer<T>(*containerOpt, value, algebra)
+				: __reduceValue<T>(_container, value, algebra);
 		}
 
 	private:
 		std::any _container;
 
 		template <typename T,
-		typename Algebra = std::function<T(T, T)>>
-		T constexpr __everyContainer (
-			container_variant const & container,
-			T const & value,
-			Algebra const & algebra) noexcept {
+			typename Algebra = std::function<T(T, T)>>
+			T constexpr __reduceContainer(
+				container_variant const& container,
+				T const& value,
+				Algebra const& algebra) noexcept {
 
 			return std::visit([this, value, algebra](auto& container) {
-				T __value = value;
+				T __value = (container.size() == 1)
+					? __reduceValue<T>(*container.begin(), value, algebra)
+					: value;
 				for (auto& element : container)
-					__value = __everyValue<T>(element, __value, algebra);
+					__value = __reduceValue<T>(element, __value, algebra);
 				return __value;
-			}, container);
+				}, container);
 		}
 
 		template <typename T,
-		typename Algebra = std::function<T(T, T)>,
-		typename Variant = std::enable_if_t<is_variant_v<T>>>
-		T constexpr __everyValue(
-			std::any const & header,
-			T const & value,
-			Algebra const & algebra) noexcept {
+			typename Algebra = std::function<T(T, T)>,
+			typename Variant = std::enable_if_t<is_variant_v<T>>>
+			T constexpr __reduceValue(
+				std::any const& header,
+				T const& value,
+				Algebra const& algebra) noexcept {
 
 			auto variantOpt = initialize_variant(header, value);
 			return (not variantOpt)
 				? value
 				: (not has_value<T>(value))
-					? *variantOpt
-					: algebra(value, *variantOpt);
+				? *variantOpt
+				: algebra(value, *variantOpt);
 		}
 
 		template <typename T,
-		typename NotVariant = std::enable_if_t<!is_variant_v<T>>,
-		typename Algebra = std::function<T(T, T)>>
-		T constexpr __everyValue(
-			std::any const & header,
-			T const & value,
-			Algebra const & algebra) noexcept {
+			typename NotVariant = std::enable_if_t<!is_variant_v<T>>,
+			typename Algebra = std::function<T(T, T)>>
+			T constexpr __reduceValue(
+				std::any const& header,
+				T const& value,
+				Algebra const& algebra) noexcept {
 
 			std::optional<T> valueOpt = get_optional_value<T>(header);
 			return (not valueOpt)
 				? value
 				: (not has_value<T>(value))
-					? *valueOpt
-					: algebra(value, *valueOpt);
+				? *valueOpt
+				: algebra(value, *valueOpt);
 
 		}
 	};
 }
+
+class ProccessorIO {
+public:
+	ProccessorIO() = default;
+	~ProccessorIO() = default;
+
+	void forward(std::any&& output) {
+		this->output = output;
+	}
+	std::any move() {
+		return (this->output) ? *this->output : 0;
+	}
+
+	template <typename T>
+	T  extract() {
+		if (!this->output) return 0;
+
+		std::optional<T> opt = utilities::get_optional_value<T>(*this->output);
+		return (opt) ? *opt : 0;
+	}
+
+	template <typename T, typename ...Ts,
+	typename Common_t = std::common_type_t<T, Ts...>,
+	typename Variadic = std::enable_if_t<sizeof...(Ts)>>
+	Common_t extract() {
+
+		if (!this->output) return 0;
+
+		std::optional<Common_t> opt = std::nullopt;
+		std::optional<std::variant<T, Ts...>> variantOpt = utilities::unpack_variant<T, Ts...>(*this->output);
+		opt = (variantOpt.has_value())
+			? utilities::current_to_common_v<T, Ts...>(*variantOpt)
+			: utilities::any_to_common_cast<T, Ts...>(*this->output);
+		return (opt) ? *opt : 0;
+	}
+
+
+private:
+	std::optional<std::any> output = std::nullopt;
+};
 
 
 class AnyNode {
@@ -236,58 +307,104 @@ public:
 	using value = std::function<std::any(std::any)>;
 
 	std::shared_ptr<AnyNode> next = nullptr;
-	std::function <std::any(std::any)> data;
+	std::optional<value> data;
 
 	AnyNode() = default;
-	~AnyNode() = default;
-	AnyNode(value _data) : data(_data) {};
+	~AnyNode()  { this->next = nullptr; };
+	explicit AnyNode(value _data) noexcept { data = _data; };
 };
 
-class AnyProccessor {
+class AnyProccessor final {
 	using node = std::shared_ptr<AnyNode>;
 	using value = std::function <std::any(std::any)>;
 public:
-	node head = nullptr;
 	AnyProccessor() = delete;
-	~AnyProccessor() = default;
-	AnyProccessor(value data) {
+	~AnyProccessor() noexcept { Free(this->head); __io.reset(); };
+	explicit AnyProccessor(value data) noexcept {
 		this->head = Insert(this->head, data);
 	}
-	AnyProccessor(const std::initializer_list<value>& list) {
+	explicit AnyProccessor(const std::initializer_list<value>& list) noexcept {
 		this->head = Merge(this->head, list);
 	}
+	AnyProccessor(const AnyProccessor& source) noexcept {
+		this->head = Copy(source.head);
+	}
+	AnyProccessor& operator=(const AnyProccessor& source) noexcept {
+		this->head = Copy(source.head);
+	}
+	AnyProccessor(AnyProccessor&& other) noexcept {
+		Free(this->head);
+		__io.reset();
+		this->head = other.head;
+		this->__io = other.__io;
+		other.head = nullptr;
+		other.__io = nullptr;
+	}
+	AnyProccessor& operator=(AnyProccessor&& other) noexcept {
+		if (this->head == other.head) return *this;
+		Free(this->head);
+		__io.reset();
+		this->head = other.head;
+		this->__io = other.__io;
+		other.head = nullptr;
+		other.__io = nullptr;
+		return *this;
+	}
+
 	AnyProccessor& insert(value data) {
 		this->head = Insert(this->head, data);
 		return *this;
 	}
-
-	std::any terminate() {
-		return Terminate(this->head);
+	AnyProccessor& now(std::any constant) noexcept {
+		this->__io->forward(Do(this->head, constant));
+		return *this;
+	}
+	AnyProccessor& now(const std::initializer_list<std::any>& list) noexcept {
+		this->__io->forward(Do(this->head, list));
+		return *this;
+	}
+	ProccessorIO& io() const noexcept {
+		return *this->__io;
 	}
 
-	std::any reduce(std::any constant) noexcept {
-		return Reduce(this->head, constant);
-	}
-	std::any reduce(const std::initializer_list<std::any>& list) noexcept {
-		return Reduce(this->head, list);
+private:
+	node head = nullptr;
+	std::shared_ptr<ProccessorIO> __io = std::make_shared<ProccessorIO>();
+
+	static void Free(node head) {
+		node current = head;
+		node next;
+		while (current) {
+			next = current->next;
+			current.reset();
+			current = next;
+		}
 	}
 
-	template<typename T>
-	T reduce_and_cast(const std::initializer_list<std::any>& list) noexcept {
-		std::any value = Reduce(this->head, list);
-		std::optional<T> valueOpt = *std::any_cast<T>(&value);
-		if (valueOpt) return *valueOpt;
-		return 0;
+	node Copy(const node head) {
+		node dummy = std::make_shared<AnyNode>();
+		node current = dummy;
+		node copy = head;
+		while (copy) {
+			node tmp = (copy->data)
+				? std::make_shared<AnyNode>(*copy->data)
+				: std::make_shared<AnyNode>();
+			current->next = tmp;
+			current = current->next;
+			copy = copy->next;
+		}
+		dummy = dummy->next;
+		return dummy;
 	}
 
-	static node Insert(node head, value data) {
+	static node Insert(node head, value data) noexcept {
 		node newNode = std::make_shared<AnyNode>(data);
 		if (head) newNode->next = head;
 		return newNode;
 	}
-	static node BackInsert(node head, value data) {
+	static node BackInsert(node head, value data) noexcept {
 		node newNode = std::make_shared<AnyNode>(data);
-		if (not head) return newNode;
+		if (!head) return newNode;
 		node current = head;
 		while (current->next)
 			current = current->next;
@@ -295,7 +412,7 @@ public:
 		return head;
 	}
 
-	static node Merge(node head, const std::initializer_list<value>& list) {
+	static node Merge(node head, const std::initializer_list<value>& list) noexcept {
 		node dummy = std::make_shared<AnyNode>();
 		node current = dummy;
 		for (auto& data : list) {
@@ -310,34 +427,38 @@ public:
 
 	static std::any Terminate(node head) noexcept {
 		node current = head;
-		if (not current->next) {
+		if (!current->next) {
 			std::any gg;
-			return current->data(gg);
+			return (current->data)
+				? (*current->data)(gg)
+				: 0;
 		}
-		std::function<std::any(std::any)> func = current->data;
+		std::optional<value> func = (current->data)
+			? (*current->data)
+			: 0;
 		std::any result = Terminate(current->next);
-		return func(result);
+		return (func) ? (*func)(result) : 0;
 	}
 
-	static std::function<std::any(std::any)> Constant(std::any value) {
+	static std::function<std::any(std::any)> Constant(std::any value) noexcept {
 		std::function<std::any(std::any)> f = [value](std::any input) {
 			return value;
 		};
 		return f;
 	}
-	static std::function<std::any(std::any)> Constant(const std::initializer_list<std::any>& list) {
+	static std::function<std::any(std::any)> Constant(const std::initializer_list<std::any>& list) noexcept {
 		std::function<std::any(std::any)> f = [list](std::any input) {
 			return list;
 		};
 		return f;
 	}
-	static std::any Reduce(node head, const std::initializer_list<std::any>& list) {
+	static std::any Do(node head, const std::initializer_list<std::any>& list) noexcept {
 		std::function <std::any(std::any)> cnst = Constant(list);
 		head = BackInsert(head, cnst);
 		return Terminate(head);
 	}
 
-	static std::any Reduce(node head, std::any constant) {
+	static std::any Do(node head, std::any constant) noexcept {
 		std::function <std::any(std::any)> cnst = Constant(constant);
 		head = BackInsert(head, cnst);
 		return Terminate(head);
@@ -355,9 +476,9 @@ namespace calculator {
 
 		static constexpr auto sum = [](T a, T b) {
 			if constexpr (is_variant_v<T>) {
-				auto a_value	=	current_to_common_v(a);
-				auto b_value	=	current_to_common_v(b);
-				T result		=	(a_value + b_value);
+				auto a_value = current_to_common_v(a);
+				auto b_value = current_to_common_v(b);
+				T result = (a_value + b_value);
 				return result;
 			}
 			else return a + b;
@@ -365,58 +486,47 @@ namespace calculator {
 
 		static constexpr auto mul = [](T a, T b) {
 			if constexpr (is_variant_v<T>) {
-				auto a_value	=	current_to_common_v(a);
-				auto b_value	=	current_to_common_v(b);
-				T result		=	(a_value * b_value);
+				auto a_value = current_to_common_v(a);
+				auto b_value = current_to_common_v(b);
+				T result = (a_value * b_value);
 				return result;
 			}
-			else { return a * b; }
+			else  return a * b;
 		};
 
 	};
 
 }
 
-template<typename, typename = void>
-constexpr bool is_type_complete_v = false;
+namespace term::reduce {
 
-template<typename T>
-constexpr bool is_type_complete_v
-<T, std::void_t<decltype(sizeof(T))>> = true;
-
-namespace term::legion {
-
-	using utilities::get_optional_value;
-
-	using std::function, std::any, std::any_cast, std::type_index;
+	using std::function, std::any, std::variant;
 	using variadic = sigma::variadic_container;
-
+	using calculator::Calculator;
 
 	template<typename T>
-	constexpr function<any(any)> legion(const function<T(T, T)>& algebra) noexcept { // std::function<T(T,T...)
+	constexpr function<any(any)> reduce(const function<T(T, T)>& algebra) noexcept { // std::function<T(T,T...)
 		function<any(any)> redex = [algebra](any input) {
 			variadic variadic_container(input);
-			return variadic_container.everyValue<T>(algebra);
+			return variadic_container.reduceValue<T>(algebra);
 		};
 		return redex;
 	}
 
-	template<typename T, typename ...Ts>
-	constexpr std::function<std::any(std::any)> sum() noexcept {
-		if constexpr (sizeof...(Ts) > 0) {
-			std::function<std::variant<T, Ts...>(std::variant<T, Ts...>, std::variant<T, Ts...>)> f = calculator::Calculator<std::variant<T, Ts...>>::sum;
-			return legion<std::variant<T,Ts...>>(f);
-			//return legion<T>(f);
-			//return legion<T>(Calculator<std::variant<T, Ts...>>::sum);
-		}
-		else {
-			return legion<T>(calculator::Calculator<T>::sum);
-		}
+	template<typename T, typename ...Ts,
+		typename R = function<any(any)> >
+		constexpr R sum() noexcept {
+		return sizeof...(Ts)
+			? reduce<variant<T, Ts...>>(Calculator<variant<T, Ts...>>::sum)
+			: reduce<T>(Calculator<T>::sum);
 	};
 
-	template<typename T>
-	constexpr std::function<std::any(std::any)> mul() noexcept {
-		return legion<T>(calculator::Calculator<T>::mul);
+	template<typename T, typename ...Ts,
+		typename R = function<any(any)> >
+		constexpr R mul() noexcept {
+		return sizeof...(Ts)
+			? reduce<variant<T, Ts...>>(Calculator<variant<T, Ts...>>::mul)
+			: reduce<T>(Calculator<T>::mul);
 	};
 }
 
