@@ -119,6 +119,7 @@ namespace utilities {
 		return value;
 	}
 
+	/*
 	template <typename ... Ts>
 	auto contineous_cast(auto value) {
 
@@ -149,6 +150,7 @@ namespace utilities {
 		//std::cout << tp::size(pack) << std::endl;
 		return value;
 	}
+	*/
 
 	template <class T, class... Ts>
 	auto unpack_variant(std::any any) {
@@ -193,8 +195,8 @@ namespace sigma {
 		template<class C>
 		variadic_container& operator=(C&& c) noexcept { _container = std::move(c); return *this; }
 
-		template<typename T>
-		T constexpr reduceValue(const std::function<T(T, T)>& algebra) noexcept {
+		template<typename T, typename Algebra>
+		T constexpr reduceValue(const Algebra& algebra) noexcept {
 
 			std::optional<container_variant> containerOpt = any_to_variant_cast<ANY_VARIANTS>(_container);
 			T value = (not containerOpt)
@@ -205,15 +207,28 @@ namespace sigma {
 				: __reduceValue<T>(_container, value, algebra);
 		}
 
+		template<typename T, typename Algebra, typename ConstantAlgebra>
+		T constexpr reduceValue(const Algebra& algebra, const ConstantAlgebra& constantAlgebra) noexcept {
+
+			std::optional<container_variant> containerOpt = any_to_variant_cast<ANY_VARIANTS>(_container);
+			T value = (not containerOpt)
+				? __reduceValue<T>(_container, 0, algebra, constantAlgebra)
+				: 0;
+			return (containerOpt)
+				? __reduceContainer<T>(*containerOpt, value, algebra, constantAlgebra)
+				: __reduceValue<T>(_container, value, algebra, constantAlgebra);
+
+		}
+
+
 	private:
 		std::any _container;
 
-		template <typename T,
-			typename Algebra = std::function<T(T, T)>>
-			T constexpr __reduceContainer(
-				container_variant const& container,
-				T const& value,
-				Algebra const& algebra) noexcept {
+		template <typename T, typename Algebra>
+		T constexpr __reduceContainer(
+			container_variant const& container,
+			T const& value,
+			Algebra const& algebra) noexcept {
 
 			return std::visit([this, value, algebra](auto& container) {
 				T __value = (container.size() == 1)
@@ -222,8 +237,29 @@ namespace sigma {
 				for (auto& element : container)
 					__value = __reduceValue<T>(element, __value, algebra);
 				return __value;
-				}, container);
+			}, container);
 		}
+
+		template <typename T, typename Algebra, typename ConstantAlgebra>
+		T constexpr __reduceContainer(
+			container_variant const& container,
+			T const& value,
+			Algebra const& algebra,
+			ConstantAlgebra const& constantAlgebra
+			) noexcept {
+
+			return std::visit([this, value, algebra, constantAlgebra](auto& container) {
+				T __value = (container.size() == 1)
+					? __reduceValue<T>(*container.begin(), value, algebra, constantAlgebra)
+					: value;
+				for (auto& element : container)
+					__value = __reduceValue<T>(element, __value, algebra, constantAlgebra);
+				return __value;
+				}, container);
+
+		}
+
+		/* Two arguments Algebra specialization */
 
 		template <typename T,
 			typename Algebra = std::function<T(T, T)>,
@@ -255,8 +291,48 @@ namespace sigma {
 				: (not has_value<T>(value))
 				? *valueOpt
 				: algebra(value, *valueOpt);
-
 		}
+
+		/* Two arguments Algebra specialization with capture constant */
+
+		template <typename T,
+			typename Algebra = std::function<T(T, T)>,
+			typename ConstantAlgebra = std::function<T(T)>,
+			typename Variant = std::enable_if_t<is_variant_v<T>>>
+			T constexpr __reduceValue(
+				std::any const& header,
+				T const& value,
+				Algebra const& algebra,
+				ConstantAlgebra const& constantAlgebra
+				) noexcept {
+
+			auto variantOpt = initialize_variant(header, value);
+			return (not variantOpt)
+				? value
+				: (not has_value<T>(value))
+				? constantAlgebra(*variantOpt)
+				: algebra(value, constantAlgebra(*variantOpt));
+		}
+
+		template <typename T,
+			typename NotVariant = std::enable_if_t<!is_variant_v<T>>,
+			typename Algebra = std::function<T(T, T)>,
+			typename ConstantAlgebra = std::function<T(T)>>
+			T constexpr __reduceValue(
+				std::any const& header,
+				T const& value,
+				Algebra const& algebra,
+				ConstantAlgebra const& constantAlgebra
+				) noexcept {
+
+			std::optional<T> valueOpt = get_optional_value<T>(header);
+			return (not valueOpt)
+				? value
+				: (not has_value<T>(value))
+				? constantAlgebra(*valueOpt)
+				: algebra(value, constantAlgebra(*valueOpt));
+		}
+
 	};
 }
 
@@ -474,7 +550,7 @@ namespace calculator {
 	template<typename T>
 	struct Calculator {
 
-		static constexpr auto sum = [](T a, T b) {
+		static constexpr T sum(T a, T b) {
 			if constexpr (is_variant_v<T>) {
 				auto a_value = current_to_common_v(a);
 				auto b_value = current_to_common_v(b);
@@ -484,7 +560,7 @@ namespace calculator {
 			else return a + b;
 		};
 
-		static constexpr auto mul = [](T a, T b) {
+		static constexpr T mul(T a, T b) {
 			if constexpr (is_variant_v<T>) {
 				auto a_value = current_to_common_v(a);
 				auto b_value = current_to_common_v(b);
@@ -499,13 +575,13 @@ namespace calculator {
 }
 
 namespace term::reduce {
-
+	using namespace std::placeholders;
 	using std::function, std::any, std::variant;
 	using variadic = sigma::variadic_container;
 	using calculator::Calculator;
 
-	template<typename T>
-	constexpr function<any(any)> reduce(const function<T(T, T)>& algebra) noexcept { // std::function<T(T,T...)
+	template<typename T, typename Algebra>
+	constexpr function<any(any)> reduce(const Algebra& algebra) noexcept { // std::function<T(T,T...)
 		function<any(any)> redex = [algebra](any input) {
 			variadic variadic_container(input);
 			return variadic_container.reduceValue<T>(algebra);
@@ -513,6 +589,17 @@ namespace term::reduce {
 		return redex;
 	}
 
+	template<typename T, typename Algebra, typename ConstantAlgebra>
+	constexpr function<any(any)> reduce(const Algebra& algebra, const ConstantAlgebra& constantAlgebra) noexcept { // std::function<T(T,T...)
+		function<any(any)> redex = [algebra, constantAlgebra](any input) {
+			variadic variadic_container(input);
+			return variadic_container.reduceValue<T>(algebra, constantAlgebra);
+		};
+		return redex;
+	}
+
+
+	/* Non-generic lambda expressions / Лямбы без состояния */
 	template<typename T, typename ...Ts,
 		typename R = function<any(any)> >
 		constexpr R sum() noexcept {
@@ -527,6 +614,26 @@ namespace term::reduce {
 		return sizeof...(Ts)
 			? reduce<variant<T, Ts...>>(Calculator<variant<T, Ts...>>::mul)
 			: reduce<T>(Calculator<T>::mul);
+	};
+
+	/* Generic lambda expressions / Лямбы c состоянием (захваченной переменной) */
+	template<typename T, typename ...Ts,
+	typename Single = std::enable_if_t<!sizeof...(Ts)>,
+	typename R = function<any(any)> >
+	constexpr R sum(T constant) noexcept {
+		std::function<T(T, T)> algebra = Calculator<T>::sum;
+		std::function<T(T)> constantAlgebra = std::bind(Calculator<T>::sum, _1, constant);
+		return reduce<T>(algebra, constantAlgebra);
+	};
+
+	template<typename T, typename ...Ts,
+	typename Single = std::enable_if_t<sizeof...(Ts)>,
+	typename Variant = variant<T, Ts...>,
+	typename R = function<any(any)> >
+	constexpr R sum(Variant constant) noexcept {
+		std::function<Variant(Variant, Variant)> algebra = Calculator<Variant>::sum;
+		std::function<Variant(Variant)> constantAlgebra = std::bind(Calculator<Variant>::sum, _1, constant);
+		return reduce<Variant>(algebra, constantAlgebra);
 	};
 }
 

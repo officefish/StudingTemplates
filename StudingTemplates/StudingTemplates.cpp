@@ -12,6 +12,10 @@
 #include "./AnyVisitor.hpp"
 #include "./type_container/type_pack.h"
 
+//#include <ranges>
+
+//#include <experimental/ty>
+
 template <typename T>
 void showMeTheRiver(T arg) {
 	std::cout << proccessor::utilities::type_name<T>() << std::endl;
@@ -19,9 +23,10 @@ void showMeTheRiver(T arg) {
 
 int main() {
 
+
 	using proccessor::utilities::cast_to_smallest;
 	using proccessor::utilities::contineous_cast;
-
+	/*
 	static_assert(std::is_same_v<const unsigned char, decltype(cast_to_smallest<     0, unsigned char, short, int>)>);
 	static_assert(std::is_same_v<const unsigned char, decltype(cast_to_smallest<   255, unsigned char, short, int>)>);
 	static_assert(std::is_same_v<const short, decltype(cast_to_smallest<   256, unsigned char, short, int>)>);
@@ -38,7 +43,14 @@ int main() {
 	//using optimus = typename m_contineous_cast<a_const, unsigned char, short, int>::type;
 	//optimus b = 400;
 	showMeTheRiver(b);
+	*/
 
+	auto sm_g = term::reduce::sum<int>(25);
+	auto sm_gv = term::reduce::sum<int8_t, int16_t, int32_t>(127);
+
+	AnyProccessor p{ sm_g };
+	int i2 = p.now({ 1, 2, 3 }).io().extract<int>();
+	std::cout << i2 << std::endl; // output: 4096 // (64*(8*(4+(2+(1+1)))))
 
 	auto sm = term::reduce::sum<int>();
 	auto ml = term::reduce::mul<int>();

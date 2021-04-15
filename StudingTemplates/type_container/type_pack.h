@@ -381,7 +381,7 @@ namespace proccessor::utilities {
 
 	/* Check is save cast*/
 	template <typename From, typename To>
-	bool is_save_cast(auto source) {
+	bool is_save_cast(From source) {
 		return static_cast<From>(static_cast<To>(source)) == source;
 	};
 
